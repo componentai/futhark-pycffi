@@ -11,6 +11,7 @@ class Gettable(object):
     def get(self):
         return self.fh.from_futhark(self.futdata)
 
+
 class FutharkCompat(Futhark):
     """
     A subclass that wraps all arrays in
@@ -19,13 +20,13 @@ class FutharkCompat(Futhark):
     """
 
     def make_wrapper(self, ff):
-        wrapper = Futhark.make_wrapper(self,ff)
+        wrapper = Futhark.make_wrapper(self, ff)
 
         @wraps(wrapper)
         def subwrapper(*args):
             uwargs = []
             for arg in args:
-                if hasattr(arg, 'futdata'):
+                if hasattr(arg, "futdata"):
                     uwargs.append(arg.futdata)
                 else:
                     uwargs.append(arg)

@@ -6,14 +6,15 @@ from cffi import FFI
 
 
 def strip_includes(header):
-    return re.sub('^(#ifdef __cplusplus\n.*\n#endif|#.*)\n', '', header, flags=re.M)
+    return re.sub("^(#ifdef __cplusplus\n.*\n#endif|#.*)\n", "", header, flags=re.M)
+
 
 def build(input_name, output_name):
     ffibuilder = FFI()
 
-    header_file = input_name + '.h'
-    source_file = input_name + '.c'
-    manifest_file = input_name + '.json'
+    header_file = input_name + ".h"
+    source_file = input_name + ".c"
+    manifest_file = input_name + ".json"
 
     manifest = json.load(open(manifest_file))
 
@@ -21,37 +22,40 @@ def build(input_name, output_name):
     output_name_lst[-1] = "_" + output_name_lst[-1]
     output_name = ".".join(output_name_lst)
 
-    backend = manifest['backend']
+    backend = manifest["backend"]
 
-    print('Detected platform: ' + sys.platform)
-    print('Detected backend:  ' + backend)
+    print("Detected platform: " + sys.platform)
+    print("Detected backend:  " + backend)
 
     with open(source_file) as source:
-        libraries = ['m']
-        extra_compile_args = ['-std=c99']
-        if backend == 'opencl':
-            if sys.platform == 'darwin':
-                extra_compile_args += ['-framework', 'OpenCL']
+        libraries = ["m"]
+        extra_compile_args = ["-std=c99"]
+        if backend == "opencl":
+            if sys.platform == "darwin":
+                extra_compile_args += ["-framework", "OpenCL"]
             else:
-                libraries += ['OpenCL']
-        elif backend == 'cuda':
-            libraries += ['cuda', 'cudart', 'nvrtc']
-        elif backend == 'multicore':
-            extra_compile_args += ['-pthread']
-        ffibuilder.set_source(output_name,
-                              source.read(),
-                              libraries=libraries,
-                              extra_compile_args=extra_compile_args)
+                libraries += ["OpenCL"]
+        elif backend == "cuda":
+            libraries += ["cuda", "cudart", "nvrtc"]
+        elif backend == "multicore":
+            extra_compile_args += ["-pthread"]
+        ffibuilder.set_source(
+            output_name,
+            source.read(),
+            libraries=libraries,
+            extra_compile_args=extra_compile_args,
+        )
 
     with open(header_file) as header:
-        cdef = 'typedef void* cl_command_queue;'
-        cdef += '\ntypedef void* cl_mem;'
-        cdef += '\ntypedef void* CUdeviceptr;'
+        cdef = "typedef void* cl_command_queue;"
+        cdef += "\ntypedef void* cl_mem;"
+        cdef += "\ntypedef void* CUdeviceptr;"
         cdef += strip_includes(header.read())
         cdef += "\nvoid free(void *ptr);"
         ffibuilder.cdef(cdef)
 
     return ffibuilder
+
 
 def main():
     name = sys.argv[1]

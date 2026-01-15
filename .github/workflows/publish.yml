@@ -55,10 +55,12 @@ jobs:
           $url = "https://futhark-lang.org/releases/futhark-nightly-windows-x86_64.zip"
           Invoke-WebRequest -Uri $url -OutFile futhark.zip
           Expand-Archive -Path futhark.zip -DestinationPath C:\futhark
-          $env:Path = "C:\futhark\futhark-nightly-windows-x86_64\bin;" + $env:Path
-          [Environment]::SetEnvironmentVariable("Path", $env:Path, "Machine")
+          # List contents to verify structure
+          Get-ChildItem -Path C:\futhark -Recurse -Depth 2 | Select-Object FullName
+          # Add to PATH for subsequent steps
           echo "C:\futhark\futhark-nightly-windows-x86_64\bin" >> $env:GITHUB_PATH
-          futhark --version
+          # Verify installation using full path
+          C:\futhark\futhark-nightly-windows-x86_64\bin\futhark.exe --version
 
       - name: Install package
         run: |

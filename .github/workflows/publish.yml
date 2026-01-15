@@ -62,6 +62,7 @@ jobs:
 
       - name: Install package
         run: |
+          uv pip install --system setuptools  # Required by cffi on Python 3.12+
           uv pip install --system -e .
 
       - name: Compile Futhark test files (Linux/macOS)

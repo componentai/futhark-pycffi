@@ -83,11 +83,12 @@ jobs:
         run: uv build
 
       - name: Publish to private PyPI
-        # The private PyPI at pypi.component-ai.dk authenticates using GitHub tokens
-        # from the componentai org. The auto-generated github.token works because all
-        # org tokens are trusted by the private index.
+        # The private PyPI at pypi.component-ai.dk authenticates using GitHub PATs
+        # from the componentai org.
+        env:
+          UV_PUBLISH_USERNAME: __token__
+          UV_PUBLISH_PASSWORD: ${{ secrets.ORG_READ_ACCESS_TOKEN }}
         run: |
           uv publish \
             --publish-url https://pypi.component-ai.dk/upload/ \
-            --token ${{ github.token }} \
             dist/*.whl

@@ -16,7 +16,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Note: Windows is excluded because Futhark's C backend generates GCC-specific code
+        # (__attribute__, __uint128_t, __builtin_clz, VLAs) that's incompatible with MSVC.
+        # Windows users need MinGW or WSL to compile Futhark code.
+        os: [ubuntu-latest, macos-latest]
         python-version: ['3.12']
 
     steps:
@@ -47,49 +50,12 @@ jobs:
           brew install futhark
           futhark --version
 
-      # Windows: Install Futhark nightly (stable releases don't include Windows binaries)
-      - name: Install Futhark (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $url = "https://futhark-lang.org/releases/futhark-nightly-windows-x86_64.zip"
-          $tempDir = Join-Path $env:TEMP "futhark-install"
-          New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
-          $zip = Join-Path $tempDir "futhark.zip"
-          
-          Invoke-WebRequest -Uri $url -OutFile $zip
-
-          $installDir = "$env:USERPROFILE\AppData\Local\Programs\futhark"
-          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-          Expand-Archive -Path $zip -DestinationPath $installDir -Force
-          
-          # Find futhark.exe dynamically (archive structure may vary)
-          $exeDir = Get-ChildItem -Path $installDir -Recurse -Filter futhark.exe | Select-Object -First 1 -ExpandProperty DirectoryName
-          if (-Not $exeDir) { throw "futhark.exe not found under $installDir" }
-          
-          # Add to PATH for subsequent steps
-          $exeDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          
-          # Verify installation
-          & "$exeDir\futhark.exe" --version
-
       - name: Install package
         run: |
           uv pip install --system setuptools  # Required by cffi on Python 3.12+
           uv pip install --system -e .
 
-      - name: Compile Futhark test files (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          futhark c --library test.fut
-          futhark c --library test_badconsts.fut
-          build_futhark_ffi test
-          build_futhark_ffi test_badconsts
-
-      - name: Compile Futhark test files (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+      - name: Compile Futhark test files
         run: |
           futhark c --library test.fut
           futhark c --library test_badconsts.fut

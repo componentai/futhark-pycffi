@@ -6,7 +6,23 @@ from cffi import FFI
 
 
 def strip_includes(header):
-    return re.sub("^(#ifdef __cplusplus\n.*\n#endif|#.*)\n", "", header, flags=re.M)
+    # Remove preprocessor directives (includes, pragmas, etc.)
+    header = re.sub(r"^#include.*\n", "", header, flags=re.M)
+    header = re.sub(r"^#pragma.*\n", "", header, flags=re.M)
+    
+    # Remove C++ extern "C" wrapper blocks that Futhark generates
+    # Pattern: #ifdef __cplusplus\nextern "C" {\n#endif
+    header = re.sub(r'#ifdef __cplusplus\s*\nextern "C" \{\s*\n#endif\s*\n?', "", header)
+    # Pattern: #ifdef __cplusplus\n}\n#endif (closing block)
+    header = re.sub(r'#ifdef __cplusplus\s*\n\}\s*\n#endif\s*\n?', "", header)
+    
+    # Also handle any remaining simple #ifdef __cplusplus blocks
+    header = re.sub(r"^#ifdef __cplusplus\n.*\n#endif\n?", "", header, flags=re.M)
+    
+    # Remove any other preprocessor directives we might have missed
+    header = re.sub(r"^#.*\n", "", header, flags=re.M)
+    
+    return header
 
 
 def build(input_name, output_name):
@@ -28,8 +44,14 @@ def build(input_name, output_name):
     print("Detected backend:  " + backend)
 
     with open(source_file) as source:
-        libraries = ["m"]
-        extra_compile_args = ["-std=c99"]
+        # Windows doesn't have libm (math is in msvcrt) and doesn't support -std=c99
+        if sys.platform == "win32":
+            libraries = []
+            extra_compile_args = []
+        else:
+            libraries = ["m"]
+            extra_compile_args = ["-std=c99"]
+        
         if backend == "opencl":
             if sys.platform == "darwin":
                 extra_compile_args += ["-framework", "OpenCL"]
@@ -38,7 +60,9 @@ def build(input_name, output_name):
         elif backend == "cuda":
             libraries += ["cuda", "cudart", "nvrtc"]
         elif backend == "multicore":
-            extra_compile_args += ["-pthread"]
+            if sys.platform != "win32":
+                extra_compile_args += ["-pthread"]
+        
         ffibuilder.set_source(
             output_name,
             source.read(),

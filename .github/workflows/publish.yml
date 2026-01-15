@@ -88,6 +88,6 @@ jobs:
         # org tokens are trusted by the private index.
         run: |
           uv publish \
-            --publish-url https://pypi.component-ai.dk/ \
+            --publish-url https://pypi.component-ai.dk/upload/ \
             --token ${{ github.token }} \
             dist/*.whl

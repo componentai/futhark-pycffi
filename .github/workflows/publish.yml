@@ -90,4 +90,4 @@ jobs:
           uv publish \
             --publish-url https://pypi.component-ai.dk/ \
             --token ${{ github.token }} \
-            dist/*
+            dist/*.whl

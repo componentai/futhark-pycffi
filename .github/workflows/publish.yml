@@ -1,0 +1,112 @@
+# Build, test on all platforms, and publish to private PyPI on version tag pushes
+# Publishes to https://pypi.component-ai.dk/
+
+name: Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      # Linux: Install Futhark from GitHub releases
+      - name: Install Futhark (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          FUTHARK_VERSION="0.25.34"
+          curl -L "https://github.com/diku-dk/futhark/releases/download/v${FUTHARK_VERSION}/futhark-${FUTHARK_VERSION}-linux-x86_64.tar.xz" -o futhark.tar.xz
+          tar -xJf futhark.tar.xz
+          sudo cp futhark-${FUTHARK_VERSION}-linux-x86_64/bin/* /usr/local/bin/
+          futhark --version
+
+      # macOS: Install Futhark via Homebrew
+      - name: Install Futhark (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install futhark
+          futhark --version
+
+      # Windows: Install Futhark nightly (stable releases don't include Windows binaries)
+      - name: Install Futhark (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = "https://futhark-lang.org/releases/futhark-nightly-windows-x86_64.zip"
+          Invoke-WebRequest -Uri $url -OutFile futhark.zip
+          Expand-Archive -Path futhark.zip -DestinationPath C:\futhark
+          $env:Path = "C:\futhark\futhark-nightly-windows-x86_64\bin;" + $env:Path
+          [Environment]::SetEnvironmentVariable("Path", $env:Path, "Machine")
+          echo "C:\futhark\futhark-nightly-windows-x86_64\bin" >> $env:GITHUB_PATH
+          futhark --version
+
+      - name: Install package
+        run: |
+          uv pip install --system -e .
+
+      - name: Compile Futhark test files (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          futhark c --library test.fut
+          futhark c --library test_badconsts.fut
+          build_futhark_ffi test
+          build_futhark_ffi test_badconsts
+
+      - name: Compile Futhark test files (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          futhark c --library test.fut
+          futhark c --library test_badconsts.fut
+          build_futhark_ffi test
+          build_futhark_ffi test_badconsts
+
+      - name: Run tests
+        run: |
+          python test.py
+
+  publish:
+    name: Publish to Private PyPI
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for setuptools-scm if used
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to private PyPI
+        # The private PyPI at pypi.component-ai.dk authenticates using GitHub tokens
+        # from the componentai org. The auto-generated github.token works because all
+        # org tokens are trusted by the private index.
+        run: |
+          uv publish \
+            --publish-url https://pypi.component-ai.dk/ \
+            --token ${{ github.token }} \
+            dist/*

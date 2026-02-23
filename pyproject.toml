@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "futhark_ffi"
+version = "0.16.1"
+requires-python = ">=3.12"
+description = "A Python library using the Futhark C backend via CFFI"
+readme = "README.md"
+authors = [{ name = "Pepijn de Vos" }]
+dependencies = ["numpy>=2.0.0", "cffi"]
+
+[project.urls]
+Homepage = "https://github.com/pepijndevos/futhark-pycffi"
+
+[project.scripts]
+build_futhark_ffi = "futhark_ffi.build:main"
+
+[tool.setuptools]
+packages = ["futhark_ffi"]

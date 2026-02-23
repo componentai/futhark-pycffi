@@ -2,6 +2,8 @@ from functools import partial, wraps
 
 import numpy as np
 
+__version__ = "0.16.1"
+
 np_types = {
     "int8_t": "int8",
     "int16_t": "int16",
@@ -60,9 +62,7 @@ class Futhark(object):
 
         if tuning:
             for k, v in tuning.items():
-                mod.lib.futhark_context_config_set_tuning_param(
-                    self.conf, k.encode("ascii"), v
-                )
+                mod.lib.futhark_context_config_set_tuning_param(self.conf, k.encode("ascii"), v)
 
         def free_ctx(ctx):
             mod.lib.futhark_context_free(ctx)
@@ -94,9 +94,7 @@ class Futhark(object):
             elif fn.startswith("futhark_free"):
                 arg_t = ff_t.args[1]
                 self.types.setdefault(arg_t, Type()).free = ff
-            elif fn.startswith("futhark_values") and not fn.startswith(
-                "futhark_values_raw"
-            ):
+            elif fn.startswith("futhark_values") and not fn.startswith("futhark_values_raw"):
                 arg_t = ff_t.args[1]
                 self.types.setdefault(arg_t, Type()).values = ff
             elif fn.startswith("futhark_shape"):
@@ -126,21 +124,15 @@ class Futhark(object):
         if isinstance(data, self.ffi.CData):
             return data  # opaque type
         else:
-            datat = data.astype(
-                np_types[fut_type.itemtype.item.cname], copy=False, order="C"
-            )
+            datat = data.astype(np_types[fut_type.itemtype.item.cname], copy=False, order="C")
             ptr = self.ffi.cast(fut_type.itemtype, self.ffi.from_buffer(datat))
             constr = fut_type.new
             destr = fut_type.free
-            return self.ffi.gc(
-                constr(self.ctx, ptr, *data.shape), partial(destr, self.ctx)
-            )
+            return self.ffi.gc(constr(self.ctx, ptr, *data.shape), partial(destr, self.ctx))
 
     def _errorcheck(self, err):
         if err != 0:
-            raise ValueError(
-                self._get_string(self.lib.futhark_context_get_error(self.ctx))
-            )
+            raise ValueError(self._get_string(self.lib.futhark_context_get_error(self.ctx)))
 
     def _from_futhark(self, data):
         # import ipdb; ipdb.set_trace()
@@ -180,9 +172,7 @@ class Futhark(object):
         converters = []
         out_types = []
         for arg_t in ff_t.args[1:]:
-            if arg_t.kind == "pointer" and (
-                arg_t.item.kind == "primitive" or arg_t.item.kind == "pointer"
-            ):
+            if arg_t.kind == "pointer" and (arg_t.item.kind == "primitive" or arg_t.item.kind == "pointer"):
                 # output arguments
                 out_types.append(arg_t)
             else:
@@ -203,9 +193,7 @@ class Futhark(object):
             results = []
             for out_t, out in zip(out_types, out_args):
                 if out_t.item in self.types:
-                    ptr = self.ffi.gc(
-                        out[0], partial(self.types[out_t.item].free, self.ctx)
-                    )
+                    ptr = self.ffi.gc(out[0], partial(self.types[out_t.item].free, self.ctx))
                     results.append(ptr)
                 else:
                     results.append(out[0])

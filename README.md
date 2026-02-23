@@ -1,4 +1,5 @@
 # futhark-ffi
+
 [![Test](https://github.com/pepijndevos/futhark-pycffi/actions/workflows/ci.yml/badge.svg)](https://github.com/pepijndevos/futhark-pycffi/actions/workflows/ci.yml)
 
 Python library using the Futhark C backend via CFFI
@@ -22,6 +23,7 @@ and multi-dimensional arrays are supported.
 ## Installation
 
 [Install Futhark](https://futhark.readthedocs.io/en/latest/installation.html), then simply
+
 ```bash
 pip install futhark-ffi
 ```
@@ -49,4 +51,4 @@ test.from_futhark(res)
 
 ## Example usage
 
-* https://github.com/mortvest/hastl
+* <https://github.com/mortvest/hastl>

@@ -48,6 +48,23 @@ class TestFFI(unittest.TestCase):
         assert_array_equal(pos, np.arange(10))
         assert_array_equal(neg, -np.arange(10))
 
+        zipped = self.fut.test12(
+            np.arange(10, dtype=np.int8), -np.arange(10, dtype=np.int8)
+        )
+        (pos, neg) = self.fut.test7(zipped)
+        (pos, neg) = self.fut.from_futhark(pos, neg)
+        assert_array_equal(pos, np.arange(10))
+        assert_array_equal(neg, -np.arange(10))
+
+    def test_tuple_input(self):
+        self.assertEqual(self.fut.test11((4, 5)), 9)
+
+    def test_record_from_futhark(self):
+        res = self.fut.test10a(42)
+        pyres = self.fut.from_futhark(res)
+        self.assertEqual(pyres.testfield, 42)
+        self.assertEqual(pyres["testfield"], 42)
+
     def test_store(self):
         stored = self.fut.test10a(42)
         intermediate = self.fut.store_testOpaque(stored)
@@ -101,6 +118,9 @@ class TestCompat(unittest.TestCase):
         (pos, neg) = self.fut.test7(res)
         assert_array_equal(pos.get(), np.arange(10))
         assert_array_equal(neg.get(), -np.arange(10))
+
+    def test_tuple_input(self):
+        self.assertEqual(self.fut.test11((4, 5)), 9)
 
     def test_bool(self):
         res = self.fut.test8(True)

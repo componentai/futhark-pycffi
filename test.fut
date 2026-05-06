@@ -30,5 +30,11 @@ type testOpaque = {testfield:i32}
 entry test10a (a: i32) : testOpaque = {testfield = a}
 entry test10b (a:testOpaque) : i32 = a.testfield
 
+entry test11 ((a, b): (f32, f32)) : f32 =
+  a + b
+
+entry test12 (a: []i8) (b: []i8) : [](i8, i8) =
+  zip a b
+
 entry issue25 [m] (xxx: [m]i32): [m]i32 =
   map (\i -> xxx[100 + i]) xxx

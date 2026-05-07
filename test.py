@@ -59,6 +59,12 @@ class TestFFI(unittest.TestCase):
     def test_tuple_input(self):
         self.assertEqual(self.fut.test11(self.fut.test4(4, 5)), 8)
 
+    def test_tuple10_projection_order(self):
+        self.assertEqual(
+            self.fut.from_futhark(self.fut.test13(100)),
+            tuple(range(100, 110)),
+        )
+
     def test_record_from_futhark(self):
         res = self.fut.test10a(42)
         pyres = self.fut.from_futhark(res)
@@ -120,6 +126,9 @@ class TestCompat(unittest.TestCase):
 
     def test_tuple_input(self):
         self.assertEqual(self.fut.test11(self.fut.test4(4, 5)), 8)
+
+    def test_tuple10_projection_order(self):
+        self.assertEqual(self.fut.test13(100).get(), tuple(range(100, 110)))
 
     def test_bool(self):
         res = self.fut.test8(True)

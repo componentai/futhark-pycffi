@@ -114,30 +114,18 @@ class Futhark(object):
                     fut_type.fields = []
                 fut_type.fields.append((field, out_t, ff))
 
-        for fut_type in self.types.values():
-            if hasattr(fut_type, "fields"):
-                # Keep tuple fields in numeric order: 0, 1, 2, ...
-                fut_type.fields.sort(key=lambda field: self._field_sort_key(field[0]))
-
     def _type(self, ctype):
         fut_type = self.types.setdefault(ctype, Type())
         fut_type.ctype = ctype
         return fut_type
 
     def _projector_field_name(self, fut_type, name):
-        if hasattr(fut_type, "ctype"):
-            cname = fut_type.ctype.item.cname
-            if cname.startswith("struct futhark_"):
-                prefix = "futhark_project_" + cname[15:] + "_"
-                if name.startswith(prefix):
-                    return name[len(prefix) :]
-        return name.rsplit("_", 1)[1]
-
-    def _field_sort_key(self, field):
-        try:
-            return (0, int(field))
-        except ValueError:
-            return (1, field)
+        cname = fut_type.ctype.item.cname
+        if cname.startswith("struct futhark_"):
+            prefix = "futhark_project_" + cname[15:] + "_"
+            if name.startswith(prefix):
+                return name[len(prefix) :]
+        raise ValueError("unexpected projector name '{}' for {}".format(name, cname))
 
     def _is_tuple_record(self, fut_type):
         return (
@@ -204,7 +192,7 @@ class Futhark(object):
     def _project_futhark_record(self, fut_type, data):
         # Project each field with generated project_opaque_* helpers.
         fields = []
-        for _, out_t, project in fut_type.fields:
+        for name, out_t, project in fut_type.fields:
             out = self.ffi.new(out_t)
             err = project(self.ctx, out, data)
             self._errorcheck(err)
@@ -212,17 +200,17 @@ class Futhark(object):
                 # Managed outputs (arrays/opaque values) recurse through _from_futhark.
                 projected_type = self.types[out_t.item]
                 projected = self.ffi.gc(out[0], partial(projected_type.free, self.ctx))
-                fields.append(self._from_futhark(projected))
+                fields.append((name, self._from_futhark(projected)))
             else:
                 # Primitive projector results are read from the out pointer.
                 self._errorcheck(self.lib.futhark_context_sync(self.ctx))
                 projected = out[0]
-                fields.append(projected)
+                fields.append((name, projected))
 
         if self._is_tuple_record(fut_type):
-            return tuple(fields)
+            return tuple(value for _, value in fields)
         else:
-            return {name: value for (name, _, _), value in zip(fut_type.fields, fields)}
+            return {name: value for name, value in fields}
 
     def from_futhark(self, *dargs):
         """

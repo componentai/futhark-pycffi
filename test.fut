@@ -36,5 +36,9 @@ entry test11 ((a, b): (f32, f32)) : f32 =
 entry test12 (a: []i8) (b: []i8) : [](i8, i8) =
   zip a b
 
+type tenTuple = (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32)
+entry test13 (x: i32) : tenTuple =
+  (x, x + 1, x + 2, x + 3, x + 4, x + 5, x + 6, x + 7, x + 8, x + 9)
+
 entry issue25 [m] (xxx: [m]i32): [m]i32 =
   map (\i -> xxx[100 + i]) xxx

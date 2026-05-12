@@ -37,7 +37,7 @@ jobs:
       - name: Install Futhark (Linux)
         if: runner.os == 'Linux'
         run: |
-          FUTHARK_VERSION="0.25.34"
+          FUTHARK_VERSION="0.26.1"
           curl -L "https://github.com/diku-dk/futhark/releases/download/v${FUTHARK_VERSION}/futhark-${FUTHARK_VERSION}-linux-x86_64.tar.xz" -o futhark.tar.xz
           tar -xJf futhark.tar.xz
           sudo cp futhark-${FUTHARK_VERSION}-linux-x86_64/bin/* /usr/local/bin/

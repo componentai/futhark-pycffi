@@ -28,7 +28,9 @@ class TestFFI(unittest.TestCase):
         assert_array_equal(pyres, np.cumsum(data))
 
     def test_multi_output(self):
-        self.assertEqual(self.fut.test4(4,5), (4+5, 4-5))
+        self.assertEqual(
+            self.fut.from_futhark(self.fut.test4(4, 5)), (4 + 5, 4 - 5)
+        )
 
     def test_2d(self):
         data = np.arange(9).reshape(3,3)
@@ -43,10 +45,30 @@ class TestFFI(unittest.TestCase):
 
     def test_opaque(self):
         res = self.fut.test6(10)
-        (pos, neg) = self.fut.test7(res)
-        (pos, neg) = self.fut.from_futhark(pos, neg)
+        (pos, neg) = self.fut.from_futhark(self.fut.test7(res))
         assert_array_equal(pos, np.arange(10))
         assert_array_equal(neg, -np.arange(10))
+
+        zipped = self.fut.test12(
+            np.arange(10, dtype=np.int8), -np.arange(10, dtype=np.int8)
+        )
+        (pos, neg) = self.fut.from_futhark(self.fut.test7(zipped))
+        assert_array_equal(pos, np.arange(10))
+        assert_array_equal(neg, -np.arange(10))
+
+    def test_tuple_input(self):
+        self.assertEqual(self.fut.test11(self.fut.test4(4, 5)), 8)
+
+    def test_tuple10_projection_order(self):
+        self.assertEqual(
+            self.fut.from_futhark(self.fut.test13(100)),
+            tuple(range(100, 110)),
+        )
+
+    def test_record_from_futhark(self):
+        res = self.fut.test10a(42)
+        pyres = self.fut.from_futhark(res)
+        self.assertEqual(pyres["testfield"], 42)
 
     def test_store(self):
         stored = self.fut.test10a(42)
@@ -85,7 +107,7 @@ class TestCompat(unittest.TestCase):
         assert_array_equal(res, np.cumsum(data))
 
     def test_multi_output(self):
-        self.assertEqual(self.fut.test4(4,5), (4+5, 4-5))
+        self.assertEqual(self.fut.test4(4, 5).get(), (4 + 5, 4 - 5))
 
     def test_2d(self):
         data = np.arange(9).reshape(3,3)
@@ -98,9 +120,15 @@ class TestCompat(unittest.TestCase):
 
     def test_opaque(self):
         res = self.fut.test6(10)
-        (pos, neg) = self.fut.test7(res)
-        assert_array_equal(pos.get(), np.arange(10))
-        assert_array_equal(neg.get(), -np.arange(10))
+        (pos, neg) = self.fut.test7(res).get()
+        assert_array_equal(pos, np.arange(10))
+        assert_array_equal(neg, -np.arange(10))
+
+    def test_tuple_input(self):
+        self.assertEqual(self.fut.test11(self.fut.test4(4, 5)), 8)
+
+    def test_tuple10_projection_order(self):
+        self.assertEqual(self.fut.test13(100).get(), tuple(range(100, 110)))
 
     def test_bool(self):
         res = self.fut.test8(True)

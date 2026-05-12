@@ -71,7 +71,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cffi" },
-    { name = "numpy" },
+    { name = "numpy", specifier = ">=2.0.0" },
 ]
 
 [[package]]

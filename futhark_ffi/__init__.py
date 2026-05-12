@@ -80,11 +80,15 @@ class Futhark(object):
         self.make_restores()
 
     def make_types(self):
+        # Build per-type metadata by scanning generated C symbols.
         self.types = {}
         for fn in dir(self.lib):
             ff = getattr(self.lib, fn)
             ff_t = self.ffi.typeof(ff)
-            if fn.startswith("futhark_new") and not fn.startswith("futhark_new_raw"):
+            if fn.startswith("futhark_new") and not (
+                fn.startswith("futhark_new_raw")
+                or fn.startswith("futhark_new_opaque")
+            ):
                 ret_t = ff_t.result
                 arg_t = ff_t.args[1]
                 rank = len(ff_t.args[2:])
@@ -93,13 +97,42 @@ class Futhark(object):
                 self.types[ret_t].rank = rank
             elif fn.startswith("futhark_free"):
                 arg_t = ff_t.args[1]
-                self.types.setdefault(arg_t, Type()).free = ff
+                fut_type = self._type(arg_t)
+                fut_type.free = ff
             elif fn.startswith("futhark_values") and not fn.startswith("futhark_values_raw"):
                 arg_t = ff_t.args[1]
                 self.types.setdefault(arg_t, Type()).values = ff
             elif fn.startswith("futhark_shape"):
                 arg_t = ff_t.args[1]
                 self.types.setdefault(arg_t, Type()).shape = ff
+            elif fn.startswith("futhark_project_opaque"):
+                obj_t = ff_t.args[2]
+                out_t = ff_t.args[1]
+                fut_type = self._type(obj_t)
+                field = self._projector_field_name(fut_type, fn)
+                if not hasattr(fut_type, "fields"):
+                    fut_type.fields = []
+                fut_type.fields.append((field, out_t, ff))
+
+    def _type(self, ctype):
+        fut_type = self.types.setdefault(ctype, Type())
+        fut_type.ctype = ctype
+        return fut_type
+
+    def _projector_field_name(self, fut_type, name):
+        cname = fut_type.ctype.item.cname
+        if cname.startswith("struct futhark_"):
+            prefix = "futhark_project_" + cname[15:] + "_"
+            if name.startswith(prefix):
+                return name[len(prefix) :]
+        raise ValueError("unexpected projector name '{}' for {}".format(name, cname))
+
+    def _is_tuple_record(self, fut_type):
+        return (
+            hasattr(fut_type, "fields")
+            and not hasattr(fut_type, "shape")
+            and all(name.isdigit() for name, _, _ in fut_type.fields)
+        )
 
     def make_entrypoints(self):
         for fn in dir(self.lib):
@@ -124,6 +157,9 @@ class Futhark(object):
         if isinstance(data, self.ffi.CData):
             return data  # opaque type
         else:
+            # Strict mode: opaque/record inputs must already be Futhark handles.
+            if not hasattr(fut_type, "new"):
+                raise TypeError("expected a Futhark opaque value")
             datat = data.astype(np_types[fut_type.itemtype.item.cname], copy=False, order="C")
             ptr = self.ffi.cast(fut_type.itemtype, self.ffi.from_buffer(datat))
             constr = fut_type.new
@@ -135,24 +171,53 @@ class Futhark(object):
             raise ValueError(self._get_string(self.lib.futhark_context_get_error(self.ctx)))
 
     def _from_futhark(self, data):
-        # import ipdb; ipdb.set_trace()
+        # Arrays are copied out via values/shape. Opaque records are projected.
         if isinstance(data, (int, float, bool)):
             return data
         cname = self.ffi.typeof(data)
         fut_type = self.types[cname]
-        cshape = fut_type.shape(self.ctx, data)
-        shape = [cshape[i] for i in range(fut_type.rank)]
-        dtype = np_types[fut_type.itemtype.item.cname]
-        result = np.zeros(shape, dtype=dtype)
-        cresult = self.ffi.cast(fut_type.itemtype, result.ctypes.data)
-        fut_type.values(self.ctx, data, cresult)
-        return result
+        if hasattr(fut_type, "values"):
+            cshape = fut_type.shape(self.ctx, data)
+            shape = [cshape[i] for i in range(fut_type.rank)]
+            dtype = np_types[fut_type.itemtype.item.cname]
+            result = np.zeros(shape, dtype=dtype)
+            cresult = self.ffi.cast(fut_type.itemtype, result.ctypes.data)
+            fut_type.values(self.ctx, data, cresult)
+            return result
+        elif hasattr(fut_type, "fields"):
+            return self._project_futhark_record(fut_type, data)
+        else:
+            return data
+
+    def _project_futhark_record(self, fut_type, data):
+        # Project each field with generated project_opaque_* helpers.
+        fields = []
+        for name, out_t, project in fut_type.fields:
+            out = self.ffi.new(out_t)
+            err = project(self.ctx, out, data)
+            self._errorcheck(err)
+            if out_t.item in self.types:
+                # Managed outputs (arrays/opaque values) recurse through _from_futhark.
+                projected_type = self.types[out_t.item]
+                projected = self.ffi.gc(out[0], partial(projected_type.free, self.ctx))
+                fields.append((name, self._from_futhark(projected)))
+            else:
+                # Primitive projector results are read from the out pointer.
+                self._errorcheck(self.lib.futhark_context_sync(self.ctx))
+                projected = out[0]
+                fields.append((name, projected))
+
+        if self._is_tuple_record(fut_type):
+            return tuple(value for _, value in fields)
+        else:
+            return {name: value for name, value in fields}
 
     def from_futhark(self, *dargs):
         """
         Converts any number of Futhark C types to Numpy arrays.
         Syncs initially and again at the end.
         """
+        # Ensure pending backend work is visible before reading host values.
         self._errorcheck(self.lib.futhark_context_sync(self.ctx))
         out = []
         for d in dargs:
@@ -193,7 +258,9 @@ class Futhark(object):
             results = []
             for out_t, out in zip(out_types, out_args):
                 if out_t.item in self.types:
-                    ptr = self.ffi.gc(out[0], partial(self.types[out_t.item].free, self.ctx))
+                    fut_type = self.types[out_t.item]
+                    ptr = self.ffi.gc(out[0], partial(fut_type.free, self.ctx))
+                    # Strict mode returns raw Futhark handles; callers use from_futhark().
                     results.append(ptr)
                 else:
                     results.append(out[0])

@@ -9,6 +9,8 @@ on:
 jobs:
   test-c:
     runs-on: ubuntu-latest
+    env:
+      FUTHARK_VERSION: "0.26.1"
 
     strategy:
       matrix:
@@ -40,10 +42,13 @@ jobs:
 
     - name: Install Futhark
       run: |
-          wget http://futhark-lang.org/releases/futhark-nightly-linux-x86_64.tar.xz
-          tar xf futhark-nightly-linux-x86_64.tar.xz
-          (cd futhark-nightly-linux-x86_64/ && PREFIX=$HOME/.local make install)
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          FUTHARK_TARBALL="futhark-${FUTHARK_VERSION}-linux-x86_64.tar.xz"
+          FUTHARK_DIR="futhark-${FUTHARK_VERSION}-linux-x86_64"
+          wget "https://github.com/diku-dk/futhark/releases/download/v${FUTHARK_VERSION}/${FUTHARK_TARBALL}"
+          tar xf "${FUTHARK_TARBALL}"
+          (cd "${FUTHARK_DIR}" && PREFIX=$HOME/.local make install)
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          futhark --version | grep -q "Futhark ${FUTHARK_VERSION}."
 
     - name: Run tests (C backend)
       run: |

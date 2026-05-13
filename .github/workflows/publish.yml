@@ -13,6 +13,8 @@ jobs:
   test:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      FUTHARK_VERSION: "0.26.1"
     strategy:
       fail-fast: false
       matrix:
@@ -37,18 +39,22 @@ jobs:
       - name: Install Futhark (Linux)
         if: runner.os == 'Linux'
         run: |
-          FUTHARK_VERSION="0.26.1"
-          curl -L "https://github.com/diku-dk/futhark/releases/download/v${FUTHARK_VERSION}/futhark-${FUTHARK_VERSION}-linux-x86_64.tar.xz" -o futhark.tar.xz
+          FUTHARK_TARBALL="futhark-${FUTHARK_VERSION}-linux-x86_64.tar.xz"
+          curl -L "https://github.com/diku-dk/futhark/releases/download/v${FUTHARK_VERSION}/${FUTHARK_TARBALL}" -o futhark.tar.xz
           tar -xJf futhark.tar.xz
-          sudo cp futhark-${FUTHARK_VERSION}-linux-x86_64/bin/* /usr/local/bin/
-          futhark --version
+          sudo cp "futhark-${FUTHARK_VERSION}-linux-x86_64/bin/"* /usr/local/bin/
+          futhark --version | grep -q "Futhark ${FUTHARK_VERSION}."
 
-      # macOS: Install Futhark via Homebrew
+      # macOS: Install Futhark from GitHub releases (supports both x86_64 and arm64)
       - name: Install Futhark (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install futhark
-          futhark --version
+          ARCH=$(uname -m)
+          FUTHARK_TARBALL="futhark-${FUTHARK_VERSION}-macos-${ARCH}.tar.xz"
+          curl -L "https://github.com/diku-dk/futhark/releases/download/v${FUTHARK_VERSION}/${FUTHARK_TARBALL}" -o futhark.tar.xz
+          tar -xJf futhark.tar.xz
+          sudo cp "futhark-${FUTHARK_VERSION}-macos-${ARCH}/bin/"* /usr/local/bin/
+          futhark --version | grep -q "Futhark ${FUTHARK_VERSION}."
 
       - name: Install package
         run: |

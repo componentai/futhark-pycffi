@@ -45,15 +45,12 @@ jobs:
           sudo cp "futhark-${FUTHARK_VERSION}-linux-x86_64/bin/"* /usr/local/bin/
           futhark --version | grep -q "Futhark ${FUTHARK_VERSION}."
 
-      # macOS: Install Futhark from GitHub releases (supports both x86_64 and arm64)
+      # macOS: Futhark doesn't publish versioned macOS binaries; use Homebrew.
+      # The version check below catches drift if Homebrew moves ahead of our pin.
       - name: Install Futhark (macOS)
         if: runner.os == 'macOS'
         run: |
-          ARCH=$(uname -m)
-          FUTHARK_TARBALL="futhark-${FUTHARK_VERSION}-macos-${ARCH}.tar.xz"
-          curl -L "https://github.com/diku-dk/futhark/releases/download/v${FUTHARK_VERSION}/${FUTHARK_TARBALL}" -o futhark.tar.xz
-          tar -xJf futhark.tar.xz
-          sudo cp "futhark-${FUTHARK_VERSION}-macos-${ARCH}/bin/"* /usr/local/bin/
+          brew install futhark
           futhark --version | grep -q "Futhark ${FUTHARK_VERSION}."
 
       - name: Install package

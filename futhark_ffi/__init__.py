@@ -2,7 +2,7 @@ from functools import partial, wraps
 
 import numpy as np
 
-__version__ = "0.16.4"
+__version__ = "0.16.5"
 
 np_types = {
     "int8_t": "int8",

@@ -50,6 +50,7 @@ jobs:
       - name: Install Futhark (macOS)
         if: runner.os == 'macOS'
         run: |
+          brew update
           brew install futhark
           futhark --version | grep -q "Futhark ${FUTHARK_VERSION}."
 
